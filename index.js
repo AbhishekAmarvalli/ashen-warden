@@ -42,11 +42,20 @@ const SYMBOLS = {
   wall: '█',
 };
 
+// ASCII art using different property names to avoid conflicts
+const ASCII_CHARS = {
+  player: ' .--.  ',
+  gameWall: '####',
+  guard: ' >--< ',
+  empty: '     ',
+};
+
 const WELCOME_ART = `
   ${COLORS.magenta}========================================${COLORS.reset}
   ${COLORS.magenta}   ASHEN WARDEN v1.0.0${COLORS.reset}
   ${COLORS.magenta}   A Turn-Based Strategy CLI Game${COLORS.reset}
   ${COLORS.magenta}========================================${COLORS.reset}
+  ${COLORS.magenta}   ${ASCII_CHARS.player}   ${COLORS.reset}
 `;
 
 const RULES = `
@@ -296,7 +305,6 @@ async function mainMenu() {
     
     switch (choice) {
       case 1:
-        // Meditate - regenerate focus
         if (state.focus < state.maxFocus) {
           state.focus = Math.min(state.maxFocus, state.focus + 10);
           console.log(`${COLORS.green}✓${COLORS.reset} You meditate and regain 10 focus!`);
@@ -306,7 +314,6 @@ async function mainMenu() {
         break;
         
       case 2:
-        // Fortify Walls
         if (state.gold >= 20) {
           state.gold -= 20;
           state.walls += 1;
@@ -317,7 +324,6 @@ async function mainMenu() {
         break;
         
       case 3:
-        // Train Militia
         if (state.gold >= 30) {
           state.gold -= 30;
           state.guards += 1;
@@ -328,7 +334,6 @@ async function mainMenu() {
         break;
         
       case 4:
-        // Rest
         if (state.gold >= 10) {
           state.gold -= 10;
           state.health = Math.min(state.maxHealth, state.health + 15);
@@ -339,18 +344,17 @@ async function mainMenu() {
         break;
         
       case 5:
-        // View Status
         clearScreen();
         console.log(WELCOME_ART);
         console.log('');
         console.log(`${COLORS.cyan}ASHEW WARDEN - STATUS SCREEN${COLORS.reset}`);
         console.log('');
-        console.log(`  ${COLORS.yellow}Wave:${COLORS.reset} ${state.wave}`);
+        console.log(`  ${ASCII_CHARS.player} Wave: ${state.wave}${COLORS.reset}`);
         console.log(`  ${COLORS.yellow}Health:${COLORS.reset} ${state.health}/${state.maxHealth} ${state.health/state.maxHealth*100}%`);
         console.log(`  ${COLORS.yellow}Focus:${COLORS.reset} ${state.focus}/${state.maxFocus} ${state.focus/state.maxFocus*100}%`);
         console.log(`  ${COLORS.yellow}Gold:${COLORS.reset} ${state.gold}`);
-        console.log(`  ${COLORS.yellow}Walls:${COLORS.reset} ${state.walls}`);
-        console.log(`  ${COLORS.yellow}Guards:${COLORS.reset} ${state.guards}`);
+        console.log(`  ${COLORS.cyan}Walls:${COLORS.reset} ${state.walls}`);
+        console.log(`  ${COLORS.green}Guards:${COLORS.reset} ${state.guards}`);
         console.log('');
         console.log(`  ${COLORS.red}Darkness:${COLORS.reset} +${state.wave * 2}%`);
         console.log('');
@@ -367,7 +371,6 @@ async function mainMenu() {
         break;
         
       case 0:
-        // Quit
         clearScreen();
         console.log(WELCOME_ART);
         console.log('');
