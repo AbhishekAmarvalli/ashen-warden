@@ -1,424 +1,273 @@
 #!/usr/bin/env node
-/**
- * Ashen Warden - A Turn-Based Strategy CLI Game
- * 
- * Protect the realm as the Ashen Warden. Manage resources, upgrade defenses,
- * and withstand waves of darkness.
+/** 
+ * Rule of Life - Turn-Based Cellular Combat Game
+ * Players choose rules that affect how cells survive/die.
+ * Enemy cells have different rules. Goal: choose effective rules to kill enemies.
  */
 
-const chalk = require('chalk').default || require('chalk');
 const readline = require('readline');
-
-const GAME_VERSION = '1.0.0';
-
-const COLORS = {
-  reset: chalk.reset,
-  bright: chalk.bright,
-  dim: chalk.dim,
-  red: chalk.red,
-  green: chalk.green,
-  yellow: chalk.yellow,
-  blue: chalk.blue,
-  magenta: chalk.magenta,
-  cyan: chalk.cyan,
-  white: chalk.white,
-  bgRed: chalk.bgRed,
-  bgGreen: chalk.bgGreen,
-  bgYellow: chalk.bgYellow,
-  bgBlue: chalk.bgBlue,
-  bgMagenta: chalk.bgMagenta,
-  bgCyan: chalk.bgCyan,
-  bgWhite: chalk.bgWhite,
-};
-
-const SYMBOLS = {
-  player: '@',
-  gold: '$',
-  shield: '🛡️',
-  sword: '⚔️',
-  heart: '❤️',
-  fire: '🔥',
-  darkness: '⚫',
-  wall: '█',
-};
-
-// ASCII art using different property names to avoid conflicts
-const ASCII_CHARS = {
-  player: ' .--.  ',
-  gameWall: '####',
-  guard: ' >--< ',
-  empty: '     ',
-};
-
-const WELCOME_ART = `
-  ${COLORS.magenta}========================================${COLORS.reset}
-  ${COLORS.magenta}   ASHEN WARDEN v1.0.0${COLORS.reset}
-  ${COLORS.magenta}   A Turn-Based Strategy CLI Game${COLORS.reset}
-  ${COLORS.magenta}========================================${COLORS.reset}
-  ${COLORS.magenta}   ${ASCII_CHARS.player}   ${COLORS.reset}
-`;
-
-const RULES = `
-  ${COLORS.cyan}GAME RULES${COLORS.reset}
-
-  Each turn you may:
-  ${COLORS.green}[1]${COLORS.reset} Meditate           - Regenerate focus (10 points)
-  ${COLORS.green}[2]${COLORS.reset} Fortify Walls       - Spend 20 gold to strengthen defenses
-  ${COLORS.green}[3]${COLORS.reset} Train Militia     - Spend 30 gold to increase guard capacity
-  ${COLORS.green}[4]${COLORS.reset} Rest              - Recover 15 health, cost 10 gold
-  ${COLORS.green}[5]${COLORS.reset} View Status       - Check your current position
-  ${COLORS.green}[0]${COLORS.reset} Quit Game         - Exit to main menu
-
-  ${COLORS.yellow}Gold${COLORS.reset} is your primary currency.
-  ${COLORS.yellow}Focus${COLORS.reset} determines your special abilities.
-  ${COLORS.yellow}Health${COLORS.reset} - survive to the end of wave 10!
-
-  ${COLORS.red}⚠️  Dark forces attack at the end of each turn!${COLORS.reset}
-`;
-
-// Game state
-const state = {
-  wave: 1,
-  gold: 150,
-  health: 100,
-  maxHealth: 100,
-  focus: 50,
-  maxFocus: 50,
-  walls: 5,
-  guards: 3,
-  gameOver: false,
-  won: false,
-};
-
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-function clearScreen() {
-  process.stdout.write('\x1B[2J\x1B[0f');
-}
+const GAME_VERSION = '1.0.0';
 
-function drawStatusBar() {
-  const healthPct = (state.health / state.maxHealth * 100).toFixed(0);
-  const focusPct = (state.focus / state.maxFocus * 100).toFixed(0);
-  
-  const healthBar = '█'.repeat(Math.max(0, Math.min(20, healthPct / 5))) +
-                    '─'.repeat(20 - Math.max(0, Math.min(20, healthPct / 5)));
-  const focusBar = '▮'.repeat(Math.max(0, Math.min(20, focusPct / 5))) +
-                   '▯'.repeat(20 - Math.max(0, Math.min(20, focusPct / 5)));
+const RULE_SETS = {
+  standard: { birth: [3], survival: [2, 3] },
+  aggressive: { birth: [3], survival: [2] },
+  lenient: { birth: [3], survival: [2, 3, 4] },
+  overcrowded: { birth: [3], survival: [2, 3] },
+  lonely: { birth: [3], survival: [3] },
+  reproductive: { birth: [3, 6], survival: [2, 3] },
+};
 
-  console.log('');
-  console.log(`  ${COLORS.bgRed}${COLORS.black} HEALTH ${healthPct}% ${COLORS.reset}${COLORS.bgRed}${COLORS.black} ${healthBar} ${COLORS.reset}`);
-  console.log(`  ${COLORS.bgBlue}${COLORS.white} FOCUS ${focusPct}% ${COLORS.reset}${COLORS.bgBlue}${COLORS.white} ${focusBar} ${COLORS.reset}`);
-  console.log(`  ${COLORS.yellow}Gold: ${state.gold}   ${COLORS.cyan}Walls: ${state.walls}   ${COLORS.green}Guards: ${state.guards}${COLORS.reset}`);
-  console.log(`  ${COLORS.magenta}Wave: ${state.wave}${COLORS.reset} ${COLORS.darkness}${COLORS.black} Darkness: +${state.wave * 2}%${COLORS.reset}`);
-  console.log('');
-}
+const ENEMY_RULE_SETS = {
+  standard: { birth: [3], survival: [2, 3] },
+  aggressive: { birth: [3], survival: [2] },
+  lenient: { birth: [3], survival: [2, 3, 4] },
+  overcrowded: { birth: [3], survival: [2, 3] },
+  lonely: { birth: [3], survival: [3] },
+  reproductive: { birth: [3, 6], survival: [2, 3] },
+};
 
-function drawWavePreview() {
-  const darkness = state.wave * 2;
-  console.log(`  ${COLORS.red}⚔️  Wave ${state.wave} approaching...${COLORS.reset}`);
-  console.log(`  ${COLORS.red}Darkness intensity: ${darkness}%${COLORS.reset}`);
-  console.log(`  ${COLORS.red}Enemies this wave: ${Math.max(3, state.wave + 2)}${COLORS.reset}`);
-  console.log('');
-}
+const RULE_EFFECTIVENESS = {
+  aggressive: { counter: ['lenient', 'reproductive'], weakAgainst: ['standard', 'overcrowded'] },
+  lenient: { counter: ['aggressive', 'overcrowded'], weakAgainst: ['standard', 'reproductive'] },
+  overcrowded: { counter: ['lenient', 'aggressive'], weakAgainst: ['standard', 'reproductive'] },
+  lonely: { counter: ['reproductive', 'standard'], weakAgainst: ['aggressive', 'lenient'] },
+  reproductive: { counter: ['lonely', 'standard'], weakAgainst: ['aggressive', 'lenient'] },
+  standard: { counter: [], weakAgainst: [] },
+};
 
-function readChoice(prompt) {
-  return new Promise(resolve => {
-    rl.question(prompt, (input) => {
-      const choice = parseInt(input.trim(), 10);
-      resolve(isNaN(choice) ? -1 : choice);
-    });
-  });
-}
+const state = {
+  width: 40, height: 20, grid: null,
+  playerRule: 'standard', enemyRule: 'aggressive',
+  turn: 1, score: 0, cellsKilled: 0,
+  gameOver: false, won: false
+};
 
-function applyDarkness() {
-  const damage = state.wave * 3;
-  const focusLoss = state.wave;
-  
-  state.health = Math.max(0, state.health - damage);
-  state.focus = Math.max(0, state.focus - focusLoss);
-  
-  if (state.walls <= 3) {
-    state.health -= 5;
+function initGrid() {
+  const grid = [];
+  for (let y = 0; y < state.height; y++) {
+    const row = [];
+    for (let x = 0; x < state.width; x++) {
+      const alive = Math.random() < 0.3;
+      row.push({ alive, type: alive ? (Math.random() < 0.5 ? 'player' : 'enemy') : 'neutral', age: 0 });
+    }
+    grid.push(row);
   }
-  
-  return damage;
+  state.grid = grid;
 }
 
-function waveAttack() {
-  console.log(`${COLORS.red}========================================${COLORS.reset}`);
-  console.log(`${COLORS.red}  DARK FORCES ATTACK${COLORS.reset}`);
-  console.log(`${COLORS.red}========================================${COLORS.reset}`);
-  
-  const damage = applyDarkness();
-  
-  console.log(`  ${COLORS.red}Damage taken: ${damage} health${COLORS.reset}`);
-  console.log(`  ${COLORS.red}Focus drained: ${state.wave}${COLORS.reset}`);
-  
-  if (state.walls > 0) {
-    const saved = Math.min(damage, 3);
-    state.walls -= 1;
-    console.log(`  ${COLORS.yellow}Walls absorbed ${saved} damage!${COLORS.reset}`);
+function countAllNeighbors(grid, x, y) {
+  let count = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = (x + dx + state.width) % state.width;
+      const ny = (y + dy + state.height) % state.height;
+      if (grid[ny][nx].alive) count++;
+    }
   }
-  
-  const guardProtection = Math.min(state.guards, 2);
-  if (guardProtection > 0) {
-    state.health = Math.min(state.maxHealth, state.health + guardProtection);
-    console.log(`  ${COLORS.green}Guards protected you for ${guardProtection} health!${COLORS.reset}`);
+  return count;
+}
+
+function applyRule(alive, neighbors, rule) {
+  const { birth, survival } = rule;
+  if (alive) return survival.includes(neighbors);
+  else return birth.includes(neighbors);
+}
+
+function computeNextState() {
+  const nextGrid = [];
+  for (let y = 0; y < state.height; y++) {
+    const row = [];
+    for (let x = 0; x < state.width; x++) {
+      const cell = state.grid[y][x];
+      const neighbors = countAllNeighbors(state.grid, x, y);
+      const rule = cell.type === 'player' ? state.playerRule : state.enemyRule;
+      const newAlive = applyRule(cell.alive, neighbors, rule);
+      row.push({ alive: newAlive, type: newAlive ? cell.type : 'neutral', age: newAlive ? cell.age + 1 : 0 });
+    }
+    nextGrid.push(row);
   }
-  
-  console.log('');
+  return nextGrid;
+}
+
+function renderGrid() {
+  let output = '';
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      const cell = state.grid[y][x];
+      output += !cell.alive ? '░' : cell.type === 'player' ? '@' : cell.type === 'enemy' ? '⚔' : '░';
+    }
+    output += '\n';
+  }
+  return output;
+}
+
+function drawStatus() {
+  const p = state.grid.flat().filter(c => c.alive && c.type === 'player').length;
+  const e = state.grid.flat().filter(c => c.alive && c.type === 'enemy').length;
+  const t = state.grid.flat().length;
+  const pp = t > 0 ? Math.round(p / (t / 2) * 100) : 0;
+  const pe = t > 0 ? Math.round(e / (t / 2) * 100) : 0;
+
+  let s = '========================================\n';
+  s += `       RULE OF LIFE - Turn ${state.turn}\n`;
+  s += `========================================\n`;
+  s += '\n';
+  s += `YOUR RULE: ${state.playerRule.toUpperCase()}\n`;
+  s += `ENEMY RULE: ${state.enemyRule.toUpperCase()}\n`;
+  s += '\n';
+  s += `Your Cells: ${p} (${pp}%)\n`;
+  s += `Enemy Cells: ${e} (${pe}%)\n`;
+  s += `Cells Killed This Turn: ${state.cellsKilled}\n`;
+  s += `Total Score: ${state.score}\n`;
+  s += '\n';
+  s += `Rule Effectiveness:\n`;
+  const eff = RULE_EFFECTIVENESS[state.playerRule];
+  if (eff.counter.length > 0) s += `  Counters: ${eff.counter.join(', ')}\n`;
+  if (eff.weakAgainst.length > 0) s += `  Weak against: ${eff.weakAgainst.join(', ')}\n`;
+  s += '\n';
+  s += '  [1] Change Rule  [2] View Rules  [0] Quit\n';
+  s += '\n';
+  return s;
+}
+
+function killedThisTurn() {
+  let k = 0;
+  const prev = state._prevGrid || state.grid;
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      const curr = state.grid[y][x];
+      const prevCell = prev[y][x];
+      if (prevCell && prevCell.alive && prevCell.type === 'player' && !curr.alive) k++;
+      if (prevCell && prevCell.alive && prevCell.type === 'enemy' && !curr.alive) k++;
+    }
+  }
+  return k;
+}
+
+async function mainMenu() {
+  await chooseRule();
+  initGrid();
+  state._prevGrid = JSON.parse(JSON.stringify(state.grid));
+  state.enemyRule = 'aggressive';
+
+  while (!state.gameOver) {
+    clearScreen();
+    console.log(drawStatus());
+    console.log(renderGrid());
+    console.log('');
+
+    console.log('========================================');
+    console.log(`       RULE OF LIFE - Turn ${state.turn}`);
+    console.log('========================================');
+    console.log('');
+
+    console.log('  Choose action:');
+    console.log(`  [1] Change Rule - Currently: ${state.playerRule.toUpperCase()}`);
+    console.log(`  [2] View Rule Effectiveness`);
+    console.log(`  [3] Next Turn`);
+    console.log(`  [0] Quit Game`);
+    console.log('');
+
+    const choice = parseInt(await readChoice('\n  Enter choice (0-3): '), 10);
+
+    switch (choice) {
+      case 1: await chooseRule(); break;
+      case 2: showEffectiveness(); await readChoice('Press Enter...'); break;
+      case 3: await nextTurn(); break;
+      case 0: clearScreen(); console.log('Farewell, Warden... Survived ' + state.turn + ' turns, Score: ' + state.score); state.gameOver = true; break;
+    }
+    if (!state.gameOver) checkGameState();
+  }
+  rl.close();
+}
+
+async function chooseRule() {
+  clearScreen();
+  console.log('Choose Your Cell Rule Set\n');
+  let i = 0;
+  for (const [key, rule] of Object.entries(RULE_SETS)) {
+    const eff = RULE_EFFECTIVENESS[key];
+    const status = eff.counter.length > 0 ? ' (counters: ' + eff.counter.join(', ') + ')' : '';
+    console.log('  [' + (i + 1) + '] ' + key.toUpperCase() + status);
+    i++;
+  }
+  console.log('  [0] Random Rule');
+  const choice = parseInt(await readChoice('\n  Select rule (0-' + Object.keys(RULE_SETS).length + '): '), 10);
+  if (choice === 0) {
+    const keys = Object.keys(RULE_SETS);
+    state.playerRule = keys[Math.floor(Math.random() * keys.length)];
+  } else if (choice > 0 && choice <= Object.keys(RULE_SETS).length) {
+    const keys = Object.keys(RULE_SETS);
+    state.playerRule = keys[choice - 1];
+  }
+  selectEnemyRule();
+}
+
+function selectEnemyRule() {
+  const pr = state.playerRule;
+  if (pr === 'standard') state.enemyRule = 'aggressive';
+  else if (pr === 'aggressive') state.enemyRule = 'standard';
+  else if (pr === 'lenient') state.enemyRule = 'aggressive';
+  else if (pr === 'overcrowded') state.enemyRule = 'aggressive';
+  else if (pr === 'lonely') state.enemyRule = 'reproductive';
+  else if (pr === 'reproductive') state.enemyRule = 'lonely';
+  if (!state.enemyRule) state.enemyRule = 'aggressive';
+}
+
+function showEffectiveness() {
+  clearScreen();
+  console.log('Rule Effectiveness Chart\n');
+  let i = 0;
+  for (const [key, rule] of Object.entries(RULE_EFFECTIVENESS)) {
+    console.log('  [' + (i + 1) + '] ' + key.toUpperCase());
+    if (rule.counter.length > 0) console.log('    Counters: ' + rule.counter.join(', '));
+    if (rule.weakAgainst.length > 0) console.log('    Weak against: ' + rule.weakAgainst.join(', '));
+    console.log('');
+    i++;
+  }
+  console.log('Press Enter to continue...');
+  readChoice('');
+}
+
+async function nextTurn() {
+  state._prevGrid = JSON.parse(JSON.stringify(state.grid));
+  state.grid = computeNextState();
+  state.cellsKilled = killedThisTurn();
+  state.score += state.cellsKilled * 10;
+  state.turn++;
+  checkGameState();
 }
 
 function checkGameState() {
-  if (state.health <= 0) {
-    state.gameOver = true;
-    state.won = false;
-    return 'gameover';
-  }
-  
-  if (state.wave > 10) {
-    state.gameOver = true;
-    state.won = true;
-    return 'won';
-  }
-  
-  return 'continue';
+  const p = state.grid.flat().filter(c => c.alive && c.type === 'player').length;
+  const e = state.grid.flat().filter(c => c.alive && c.type === 'enemy').length;
+
+  if (p <= 0) { state.gameOver = true; state.won = false; clearScreen(); console.log('GAME OVER - All cells eliminated at turn ' + state.turn); return; }
+  if (e <= 0) { state.gameOver = true; state.won = true; clearScreen(); console.log('YOU WIN - All enemies eliminated at turn ' + state.turn); return; }
+  if (state.turn >= 50) { state.gameOver = true; state.won = true; clearScreen(); console.log('SURVIVOR - ' + state.turn + ' turns! Score: ' + state.score); return; }
 }
 
-function showHelp() {
-  clearScreen();
-  console.log(WELCOME_ART);
-  console.log(RULES);
-  console.log('');
-  console.log('Controls:');
-  console.log('  Use numbers 0-5 to select actions');
-  console.log('  Press any other key to redraw interface');
-  console.log('');
-  rl.question('  Press Enter to continue...', () => {});
-}
+function clearScreen() { process.stdout.write('\x1B[2J\x1B[0f'); }
 
-function saveGame() {
-  const fs = require('fs');
-  const path = require('path');
-  const dir = path.dirname(process.mainModule.path);
-  const saveFile = path.join(dir, 'savegame.json');
-  
-  const saveData = {
-    wave: state.wave,
-    gold: state.gold,
-    health: state.health,
-    maxHealth: state.maxHealth,
-    focus: state.focus,
-    maxFocus: state.maxFocus,
-    walls: state.walls,
-    guards: state.guards,
-    timestamp: new Date().toISOString(),
-  };
-  
-  fs.writeFileSync(saveFile, JSON.stringify(saveData, null, 2));
-  console.log(`${COLORS.green}✓${COLORS.reset} Game saved successfully!`);
-  rl.question('  Press Enter to continue...', () => {});
-}
-
-function loadGame() {
-  const fs = require('fs');
-  const path = require('path');
-  const dir = path.dirname(process.mainModule.path);
-  const saveFile = path.join(dir, 'savegame.json');
-  
-  if (!fs.existsSync(saveFile)) {
-    console.log(`${COLORS.red}✗${COLORS.reset} No saved game found!`);
-    rl.question('  Press Enter to continue...', () => {});
-    return;
-  }
-  
-  try {
-    const saveData = JSON.parse(fs.readFileSync(saveFile, 'utf8'));
-    
-    state.wave = saveData.wave || 1;
-    state.gold = saveData.gold || 150;
-    state.health = saveData.health || 100;
-    state.maxHealth = saveData.maxHealth || 100;
-    state.focus = saveData.focus || 50;
-    state.maxFocus = saveData.maxFocus || 50;
-    state.walls = saveData.walls || 5;
-    state.guards = saveData.guards || 3;
-    
-    console.log(`${COLORS.green}✓${COLORS.reset} Game loaded successfully!`);
-    rl.question('  Press Enter to continue...', () => {});
-  } catch (err) {
-    console.log(`${COLORS.red}✗${COLORS.reset} Error loading save game: ${err.message}`);
-    rl.question('  Press Enter to continue...', () => {});
-  }
+function readChoice(prompt) {
+  return new Promise(resolve => { rl.question(prompt, input => { resolve(parseInt(input.trim(), 10) || -1); }); });
 }
 
 function showIntro() {
   clearScreen();
-  console.log(WELCOME_ART);
-  console.log('');
-  console.log('  In the realm of Eternal Night, you are the Ashen Warden.');
-  console.log('  Your ancestors\' ashes fuel your resolve, your blade guards the');
-  console.log('  last light against the encroaching darkness.');
-  console.log('');
-  console.log('  Your fortress stands on the edge of the abyss. The first wave');
-  console.log('  of darkness is hours away. Prepare wisely, Warden.');
-  console.log('');
-  rl.question('  Press Enter to begin your watch...', () => {});
+  console.log('RULE OF LIFE v' + GAME_VERSION);
+  console.log('Choose rules for survivability and battle enemy cells!\n');
+  console.log('Your cells use one rule set, enemy cells use another.');
+  console.log('Choose effective rules to kill the other enemy cells!\n');
+  console.log('Press Enter to continue...');
+  readChoice('');
 }
 
-async function mainMenu() {
-  let firstRun = true;
-  
-  while (!state.gameOver) {
-    clearScreen();
-    
-    if (firstRun) {
-      showIntro();
-      firstRun = false;
-    }
-    
-    drawStatusBar();
-    drawWavePreview();
-    
-    console.log(`${COLORS.cyan}========================================${COLORS.reset}`);
-    console.log(`${COLORS.cyan}       ASHEN WARDEN - Turn ${state.wave}${COLORS.reset}`);
-    console.log(`${COLORS.cyan}========================================${COLORS.reset}`);
-    console.log('');
-    console.log('  Choose your action:');
-    console.log(`  ${COLORS.green}[1]${COLORS.reset} Meditate           - Regenerate 10 focus`);
-    console.log(`  ${COLORS.green}[2]${COLORS.reset} Fortify Walls       - Spend 20 gold, +1 wall`);
-    console.log(`  ${COLORS.green}[3]${COLORS.reset} Train Militia       - Spend 30 gold, +1 guard`);
-    console.log(`  ${COLORS.green}[4]${COLORS.reset} Rest                - Recover 15 health, cost 10 gold`);
-    console.log(`  ${COLORS.green}[5]${COLORS.reset} View Status         - Check your current position`);
-    console.log(`  ${COLORS.green}[6]${COLORS.reset} Save Game           - Save progress`);
-    console.log(`  ${COLORS.green}[7]${COLORS.reset} Load Game           - Load saved progress`);
-    console.log(`  ${COLORS.green}[0]${COLORS.reset} Quit Game           - Exit`);
-    console.log('');
-    console.log('  ? Help              - Show game rules and controls');
-    
-    const choice = parseInt(await readChoice(
-      `\n  ${COLORS.yellow}Enter your choice (0-7): ${COLORS.reset}`
-    ), 10);
-    
-    switch (choice) {
-      case 1:
-        if (state.focus < state.maxFocus) {
-          state.focus = Math.min(state.maxFocus, state.focus + 10);
-          console.log(`${COLORS.green}✓${COLORS.reset} You meditate and regain 10 focus!`);
-        } else {
-          console.log(`${COLORS.yellow}~${COLORS.reset} Your focus is already full.`);
-        }
-        break;
-        
-      case 2:
-        if (state.gold >= 20) {
-          state.gold -= 20;
-          state.walls += 1;
-          console.log(`${COLORS.green}✓${COLORS.reset} Walls fortified! +1 wall (cost: 20 gold)`);
-        } else {
-          console.log(`${COLORS.red}✗${COLORS.reset} Not enough gold! You need 20 gold.`);
-        }
-        break;
-        
-      case 3:
-        if (state.gold >= 30) {
-          state.gold -= 30;
-          state.guards += 1;
-          console.log(`${COLORS.green}✓${COLORS.reset} Militia trained! +1 guard (cost: 30 gold)`);
-        } else {
-          console.log(`${COLORS.red}✗${COLORS.reset} Not enough gold! You need 30 gold.`);
-        }
-        break;
-        
-      case 4:
-        if (state.gold >= 10) {
-          state.gold -= 10;
-          state.health = Math.min(state.maxHealth, state.health + 15);
-          console.log(`${COLORS.green}✓${COLORS.reset} You rest and recover 15 health (cost: 10 gold)`);
-        } else {
-          console.log(`${COLORS.red}✗${COLORS.reset} Not enough gold! You need 10 gold.`);
-        }
-        break;
-        
-      case 5:
-        clearScreen();
-        console.log(WELCOME_ART);
-        console.log('');
-        console.log(`${COLORS.cyan}ASHEW WARDEN - STATUS SCREEN${COLORS.reset}`);
-        console.log('');
-        console.log(`  ${ASCII_CHARS.player} Wave: ${state.wave}${COLORS.reset}`);
-        console.log(`  ${COLORS.yellow}Health:${COLORS.reset} ${state.health}/${state.maxHealth} ${state.health/state.maxHealth*100}%`);
-        console.log(`  ${COLORS.yellow}Focus:${COLORS.reset} ${state.focus}/${state.maxFocus} ${state.focus/state.maxFocus*100}%`);
-        console.log(`  ${COLORS.yellow}Gold:${COLORS.reset} ${state.gold}`);
-        console.log(`  ${COLORS.cyan}Walls:${COLORS.reset} ${state.walls}`);
-        console.log(`  ${COLORS.green}Guards:${COLORS.reset} ${state.guards}`);
-        console.log('');
-        console.log(`  ${COLORS.red}Darkness:${COLORS.reset} +${state.wave * 2}%`);
-        console.log('');
-        console.log('  Press Enter to continue...');
-        rl.question('', () => {});
-        break;
-        
-      case 6:
-        saveGame();
-        break;
-        
-      case 7:
-        loadGame();
-        break;
-        
-      case 0:
-        clearScreen();
-        console.log(WELCOME_ART);
-        console.log('');
-        console.log(`${COLORS.magenta}Farewell, Ashen Warden...${COLORS.reset}`);
-        console.log(`${COLORS.magenta}You held the line for ${state.wave} waves.${COLORS.reset}`);
-        console.log('');
-        state.gameOver = true;
-        break;
-        
-      default:
-        console.log(`${COLORS.red}✗${COLORS.reset} Invalid choice. Please enter a number 0-7.`);
-        break;
-    }
-    
-    // Check game state after actions
-    if (!state.gameOver) {
-      const stateCheck = checkGameState();
-      if (stateCheck === 'continue') {
-        // Apply darkness attack at end of turn
-        waveAttack();
-        const result = checkGameState();
-        if (result !== 'continue') {
-          clearScreen();
-          drawStatusBar();
-          if (state.won) {
-            console.log(`${COLORS.green}========================================${COLORS.reset}`);
-            console.log(`${COLORS.green}       CONGRATULATIONS! YOU WIN!${COLORS.reset}`);
-            console.log(`${COLORS.green}========================================${COLORS.reset}`);
-            console.log(`  ${COLORS.green}You survived ${state.wave} waves of darkness!${COLORS.reset}`);
-            console.log(`  ${COLORS.green}Final gold: ${state.gold}${COLORS.reset}`);
-            console.log(`${COLORS.green}========================================${COLORS.reset}`);
-          } else {
-            console.log(`${COLORS.red}========================================${COLORS.reset}`);
-            console.log(`${COLORS.red}       GAME OVER${COLORS.reset}`);
-            console.log(`${COLORS.red}========================================${COLORS.reset}`);
-            console.log(`  ${COLORS.red}The darkness consumed you at wave ${state.wave}.${COLORS.reset}`);
-            console.log(`  ${COLORS.red}Final gold: ${state.gold}${COLORS.reset}`);
-            console.log(`${COLORS.red}========================================${COLORS.reset}`);
-          }
-          state.gameOver = true;
-        }
-      }
-    }
-  }
-  
-  rl.close();
-}
-
-// Start the game
 clearScreen();
 mainMenu();

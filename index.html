@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rule of Life - Cellular Combat Game</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg-secondary: #1a1a24;
+      --card: #16161f;
+      --accent: #00d4aa;
+      --accent-dim: rgba(0, 212, 170, 0.15);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --red: #ff5f57;
+      --green: #00d4aa;
+      --yellow: #ffcd07;
+      --blue: #357cd9;
+      --magenta: #aa00ff;
+      --cyan: #00ffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header {
+      width: 100%;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      background: linear-gradient(135deg, var(--bg-secondary), var(--bg));
+      border-bottom: 1px solid #2a2a3a;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header p {
+      margin: 0.5rem 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      padding: 2rem;
+      display: grid;
+      grid-template-areas:
+        "rules grid"
+        "rules score"
+        "rules grid"
+        "rules score";
+      gap: 2rem;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        grid-template-areas:
+          "rules"
+          "grid"
+          "score";
+        gap: 1rem;
+      }
+    }
+
+    .rules-panel {
+      grid-area: rules;
+      background: var(--card);
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .rules-panel h3 {
+      margin: 0 0 1rem;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+
+    .rule-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .rule-option:hover {
+      color: var(--accent);
+    }
+
+    .rule-option.selected {
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .rule-option input {
+      margin-right: 0.5rem;
+    }
+
+    .grid-panel {
+      grid-area: grid;
+      background: var(--card);
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .grid-panel canvas {
+      display: block;
+    }
+
+    .status-panel {
+      grid-area: score;
+      background: var(--card);
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .status-panel h3 {
+      margin: 0 0 1.5rem;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #2a2a3a;
+    }
+
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      color: var(--muted);
+    }
+
+    .stat-value {
+      color: var(--green);
+      font-weight: 500;
+    }
+
+    .turn-indicator {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      border-top: 1px solid #2a2a3a;
+      border-bottom: 1px solid #2a2a3a;
+      margin: 1rem 0;
+    }
+
+    .turn-label {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .turn-number {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      padding: 0.6rem 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn-secondary {
+      background: var(--bg-secondary);
+      color: var(--text);
+      border: 1px solid #2a2a3a;
+    }
+
+    .btn-danger {
+      background: rgba(255, 95, 87, 0.1);
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+
+    .instructions {
+      background: var(--bg-secondary);
+      border: 1px solid #2a2a3a;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 2rem;
+      max-width: 800px;
+    }
+
+    .instructions h3 {
+      margin: 0 0 1rem;
+      color: var(--accent);
+    }
+
+    .instructions ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+
+    .instructions li {
+      margin: 0.3rem 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .win-overlay, .game-over-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      color: var(--text);
+    }
+
+    .win-overlay h2, .game-over-overlay h2 {
+      color: var(--green);
+      margin-bottom: 1rem;
+    }
+
+    .win-overlay p, .game-over-overlay p {
+      margin: 0 0 2rem;
+      color: var(--muted);
+    }
+
+    .btn-restart {
+      padding: 0.8rem 1.5rem;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    .download-btn {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      padding: 0.5rem 0.8rem;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Rule of Life</h1>
+    <p>Gamified Conway's Game of Life - Cellular Combat</p>
+  </div>
+
+  <div class="container">
+    <div class="rules-panel">
+      <h3>Choose Your Cell Rule Set</h3>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="standard" checked>
+        Standard: Survive at 2-3 neighbors
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="aggressive">
+        Aggressive: Survive at 2 neighbors only
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="lenient">
+        Lenient: Survive at 2-4 neighbors
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="overcrowded">
+        Overcrowded: Dies from too many neighbors
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="lonely">
+        Lonely: Dies from too few neighbors
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="reproductive">
+        Reproductive: Easier to create new cells
+      </label>
+      <label class="rule-option">
+        <input type="radio" name="rule" value="random">
+        Random Rule
+      </label>
+    </div>
+
+    <div class="grid-panel">
+      <canvas id="gameCanvas" width="400" height="200"></canvas>
+    </div>
+
+    <div class="status-panel">
+      <h3>Game Status</h3>
+      <div class="turn-indicator">
+        <span class="turn-label">Turn:</span>
+        <span class="turn-number" id="turnDisplay">1</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Your Cells:</span>
+        <span class="stat-value" id="playerCount">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Enemy Cells:</span>
+        <span class="stat-value" id="enemyCount">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Cells Killed:</span>
+        <span class="stat-value" id="kills">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Total Score:</span>
+        <span class="stat-value" id="score">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-buttons">
+    <button class="btn btn-primary" id="nextTurn">Next Turn</button>
+    <button class="btn btn-secondary" id="changeRule">Change Rule</button>
+    <button class="btn btn-danger" id="quit">Quit Game</button>
+  </div>
+
+  <div class="instructions">
+    <h3>How to Play</h3>
+    <ul>
+      <li><strong>Choose a rule set:</strong> Your cells follow one of 6 rule sets that determine survival/reproduction based on neighbor count</li>
+      <li><strong>Enemy cells:</strong> Follow different rules - choose effectively to counter them</li>
+      <li><strong>Rule effectiveness:</strong> Each rule has strengths and weaknesses against others</li>
+      <li><strong>Goal:</strong> Eliminate all enemy cells to win</li>
+      <li><strong>Lose condition:</strong> All your cells are eliminated</li>
+      <li><strong>Survival victory:</strong> Survive 50 turns</li>
+    </ul>
+  </div>
+
+  <!-- Win Overlay -->
+  <div class="win-overlay" id="winOverlay">
+    <h2>YOU WIN!</h2>
+    <p>All enemy cells have been eliminated!</p>
+    <button class="btn-restart" id="restartBtn">Play Again</button>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="game-over-overlay" id="gameOverOverlay">
+    <h2>GAME OVER</h2>
+    <p>All your cells have been eliminated.</p>
+    <button class="btn-restart" id="restartBtn">Play Again</button>
+  </div>
+
+  <button class="download-btn" onclick="downloadGame()">Download</button>
+
+  <script>
+    // Game of Life Rule-Based Combat
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const rl = canvas.width = 400;
+    const cl = canvas.height = 200;
+
+    // Grid settings
+    const GRID_WIDTH = 40;
+    const GRID_HEIGHT = 20;
+    const CELL_SIZE = Math.min(canvas.width / GRID_WIDTH, canvas.height / GRID_HEIGHT) * 0.9;
+
+    // Game state
+    let grid = [];
+    let playerRule = 'standard';
+    let enemyRule = 'aggressive';
+    let turn = 1;
+    let score = 0;
+    let cellsKilled = 0;
+    let gameOver = false;
+    let gameWon = false;
+    let animationId = null;
+
+    // Rule sets: birth neighbors, survival neighbors
+    const RULES = {
+      standard: { birth: [3], survival: [2, 3] },
+      aggressive: { birth: [3], survival: [2] },
+      lenient: { birth: [3], survival: [2, 3, 4] },
+      overcrowded: { birth: [3], survival: [2, 3] },
+      lonely: { birth: [3], survival: [3] },
+      reproductive: { birth: [3, 6], survival: [2, 3] },
+    };
+
+    const ruleEffectiveness = {
+      aggressive: { counters: ['lenient', 'reproductive'], weakAgainst: ['standard', 'overcrowded'] },
+      lenient: { counters: ['aggressive', 'overcrowded'], weakAgainst: ['standard', 'reproductive'] },
+      overcrowded: { counters: ['lenient', 'aggressive'], weakAgainst: ['standard', 'reproductive'] },
+      lonely: { counters: ['reproductive', 'standard'], weakAgainst: ['aggressive', 'lenient'] },
+      reproductive: { counters: ['lonely', 'standard'], weakAgainst: ['aggressive', 'lenient'] },
+      standard: { counters: [], weakAgainst: [] },
+    };
+
+    // Initialize grid
+    function initGrid() {
+      grid = [];
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        grid[y] = [];
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          const alive = Math.random() < 0.3;
+          grid[y][x] = {
+            alive,
+            type: alive ? (Math.random() < 0.5 ? 'player' : 'enemy') : 'neutral',
+            age: 0
+          };
+        }
+      }
+    }
+
+    // Count all alive neighbors (Moore neighborhood with wrap)
+    function countNeighbors(x, y, type) {
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = (x + dx + GRID_WIDTH) % GRID_WIDTH;
+          const ny = (y + dy + GRID_HEIGHT) % GRID_HEIGHT;
+          if (grid[ny][nx].alive && grid[ny][nx].type === type) count++;
+        }
+      }
+      return count;
+    }
+
+    // Apply rule to determine next state
+    function applyRule(alive, neighbors, rule) {
+      const { birth, survival } = rule;
+      if (alive) {
+        return survival.includes(neighbors);
+      } else {
+        return birth.includes(neighbors);
+      }
+    }
+
+    // Compute next grid state
+    function computeNextState() {
+      const nextGrid = [];
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        nextGrid[y] = [];
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          const cell = grid[y][x];
+          const neighbors = countNeighbors(x, y, cell.type);
+          const rule = cell.type === 'player' ? playerRule : enemyRule;
+          const newAlive = applyRule(cell.alive, neighbors, rule);
+          nextGrid[y][x] = {
+            alive: newAlive,
+            type: newAlive ? cell.type : 'neutral',
+            age: newAlive ? cell.age + 1 : 0
+          };
+        }
+      }
+      return nextGrid;
+    }
+
+    // Calculate cells killed this turn
+    function calculateKilled() {
+      let killed = 0;
+      const prevGrid = JSON.parse(JSON.stringify(grid));
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          const curr = grid[y][x];
+          const prev = prevGrid[y][x];
+          if (prev && prev.alive && prev.type === 'player' && !curr.alive) killed++;
+          if (prev && prev.alive && prev.type === 'enemy' && !curr.alive) killed++;
+        }
+      }
+      return killed;
+    }
+
+    // Render grid
+    function renderGrid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          const cell = grid[y][x];
+          if (!cell.alive) {
+            // Dead cell - faint
+            ctx.fillStyle = 'rgba(107, 107, 128, 0.1)';
+          } else if (cell.type === 'player') {
+            // Player cell - green
+            ctx.fillStyle = '#00d4aa';
+          } else if (cell.type === 'enemy') {
+            // Enemy cell - red
+            ctx.fillStyle = '#ff5f57';
+          } else {
+            ctx.fillStyle = 'rgba(107, 107, 128, 0.1)';
+          }
+
+          const px = x * CELL_SIZE + 1;
+          const py = y * CELL_SIZE + 1;
+          ctx.fillRect(px, px, CELL_SIZE - 2, CELL_SIZE - 2);
+        }
+      }
+    }
+
+    // Update status display
+    function updateStatus() {
+      const playerCount = grid.flat().filter(c => c.alive && c.type === 'player').length;
+      const enemyCount = grid.flat().filter(c => c.alive && c.type === 'enemy').length;
+      const totalCells = GRID_WIDTH * GRID_HEIGHT;
+
+      document.getElementById('turnDisplay').textContent = turn;
+      document.getElementById('playerCount').textContent = playerCount;
+      document.getElementById('enemyCount').textContent = enemyCount;
+      document.getElementById('kills').textContent = cellsKilled;
+      document.getElementById('score').textContent = score;
+
+      // Update rule effectiveness display
+      const effectiveness = ruleEffectiveness[playerRule];
+      const rulesDiv = document.querySelector('.rules-panel');
+      rulesDiv.innerHTML = `
+        <h3>Choose Your Cell Rule Set</h3>
+        ${Object.entries(RULES).map(([key, rule]) => {
+          const eff = ruleEffectiveness[key];
+          const statusCls = key === playerRule ? 'selected' : '';
+          const counters = eff.counters.length > 0 ? `Counters: ${eff.counters.join(', ')}` : '';
+          const weak = eff.weakAgainst.length > 0 ? `Weak against: ${eff.weakAgainst.join(', ')}` : '';
+          return `<label class="rule-option ${statusCls}">
+            <input type="radio" name="rule" value="${key}" ${key === playerRule ? 'checked' : ''}>
+            ${key.charAt(0).toUpperCase() + key.slice(1)} - ${rule.birth.length > 1 ? 'Birth: ' + rule.birth + ' | ' : ''}Survival: ${rule.survival.join(', ')} ${counters} ${weak}
+          </label>`;
+        }).join('')}
+        <label class="rule-option">
+          <input type="radio" name="rule" value="random">
+          Random Rule
+        </label>
+      `;
+    }
+
+    // Check game state
+    function checkGameState() {
+      const playerCount = grid.flat().filter(c => c.alive && c.type === 'player').length;
+      const enemyCount = grid.flat().filter(c => c.alive && c.type === 'enemy').length;
+
+      if (playerCount <= 0) {
+        gameOver = true;
+        gameWon = false;
+        showOverlay('gameOver');
+        return;
+      }
+      if (enemyCount <= 0) {
+        gameOver = true;
+        gameWon = true;
+        showOverlay('win');
+        return;
+      }
+      if (turn >= 50) {
+        gameOver = true;
+        gameWon = true;
+        showOverlay('win');
+        return;
+      }
+    }
+
+    // Show overlay
+    function showOverlay(type) {
+      clearInterval(animationId);
+      const overlay = type === 'win' ? document.getElementById('winOverlay') : document.getElementById('gameOverOverlay');
+      overlay.style.display = 'flex';
+    }
+
+    // Hide overlay and restart
+    function restartGame() {
+      const overlay = document.getElementById('winOverlay');
+      const overlay2 = document.getElementById('gameOverOverlay');
+      overlay.style.display = 'none';
+      overlay2.style.display = 'none';
+      initGrid();
+      updateStatus();
+      animate();
+    }
+
+    // Main animation loop
+    function animate() {
+      renderGrid();
+      updateStatus();
+      checkGameState();
+
+      // Apply rule set
+      grid = computeNextState();
+      cellsKilled = calculateKilled();
+      score += cellsKilled * 10;
+      turn++;
+
+      animationId = setTimeout(animate, 200);
+    }
+
+    // Event listeners
+    document.querySelectorAll('input[name="rule"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (e.target.value === 'random') {
+          const keys = Object.keys(RULES);
+          playerRule = keys[Math.floor(Math.random() * keys.length)];
+        } else {
+          playerRule = e.target.value;
+        }
+        // Assign enemy rule based on player choice
+        assignEnemyRule();
+        updateStatus();
+      });
+    });
+
+    document.getElementById('nextTurn').addEventListener('click', () => {
+      if (!gameOver) {
+        animate();
+      }
+    });
+
+    document.getElementById('changeRule').addEventListener('click', () => {
+      // Cycle to next rule
+      const keys = Object.keys(RULES);
+      const currentIndex = keys.indexOf(playerRule);
+      playerRule = keys[(currentIndex + 1) % keys.length];
+      assignEnemyRule();
+      updateStatus();
+    });
+
+    document.getElementById('quit').addEventListener('click', () => {
+      location.reload();
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+    function assignEnemyRule() {
+      if (playerRule === 'standard') enemyRule = 'aggressive';
+      else if (playerRule === 'aggressive') enemyRule = 'standard';
+      else if (playerRule === 'lenient') enemyRule = 'aggressive';
+      else if (playerRule === 'overcrowded') enemyRule = 'aggressive';
+      else if (playerRule === 'lonely') enemyRule = 'reproductive';
+      else if (playerRule === 'reproductive') enemyRule = 'lonely';
+      else enemyRule = 'aggressive';
+    }
+
+    // Download game button
+    function downloadGame() {
+      const text = `
+Rule of Life - Cellular Combat Game
+====================================
+
+Rule Sets:
+- Standard: Survive at 2-3 neighbors
+- Aggressive: Survive at 2 neighbors only
+- Lenient: Survive at 2-4 neighbors
+- Overcrowded: Dies from too many neighbors
+- Lonely: Dies from too few neighbors
+- Reproductive: Easier to create new cells
+
+Rule Effectiveness:
+${Object.entries(ruleEffectiveness).map(([key, rule]) => 
+  `• ${key}: Counters: ${rule.counters.join(', ')} | Weak against: ${rule.weakAgainst.join(', ')}`).join('\n')}
+
+Game Mechanics:
+- Player chooses rule set for cell survivability
+- Enemy cells have different rules
+- Goal: Choose effective rules to kill enemy cells
+- Turn-based combat on 40x20 grid
+
+Win: Eliminate all enemy cells
+Lose: All your cells eliminated
+Survival Victory: Survive 50 turns
+
+Enjoy the game!
+      `.trim();
+
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rule-of-life-rules.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Start game
+    initGrid();
+    updateStatus();
+    animate();
+  </script>
+</body>
+</html>
